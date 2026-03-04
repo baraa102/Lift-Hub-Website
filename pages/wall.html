@@ -1,0 +1,35 @@
+<section class="card">
+  <h2 style="margin:0 0 8px">Appreciation Wall</h2>
+  <p class="muted" style="margin:0 0 12px">
+    Post positive messages (like Padlet). You can like and comment. Admin can delete posts. You can report posts.
+  </p>
+
+  <div class="row">
+    <div class="card soft">
+      <h3 style="margin:0 0 8px">New Post</h3>
+      <input class="input" id="wTitle" placeholder="Title (e.g., Thank you Coach!)" />
+      <textarea class="input" id="wBody" style="margin-top:10px;min-height:120px" placeholder="Write something kind…"></textarea>
+      <input class="input" id="wTags" style="margin-top:10px" placeholder="Tags (comma separated e.g. teacher, friend)" />
+      <button class="btn primary" id="wPost" style="margin-top:10px">Post</button>
+      <p class="muted" id="wMsg" style="margin:10px 0 0"></p>
+    </div>
+
+    <div class="card soft">
+      <h3 style="margin:0 0 8px">Filter</h3>
+      <input class="input" id="wSearch" placeholder="Search title/body/tags…" />
+      <select class="input" id="wSort" style="margin-top:10px">
+        <option value="new">Newest</option>
+        <option value="top">Most liked</option>
+      </select>
+
+      <div class="card soft" style="margin-top:12px">
+        <div class="muted">Tip: keep it respectful. No bullying.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card soft" style="margin-top:12px">
+    <h3 style="margin:0 0 8px">Posts</h3>
+    <div id="wList"></div>
+  </div>
+</section>

@@ -1,0 +1,36 @@
+<section class="card">
+  <h2 style="margin:0 0 8px">Kindness Quest</h2>
+  <p class="muted" style="margin:0 0 12px">A daily kindness task + quote. Build a streak.</p>
+
+  <div class="row">
+    <div class="card soft">
+      <h3 style="margin:0 0 8px">Today’s Quote</h3>
+      <div class="card soft" style="margin-top:10px">
+        <div id="kQuote" style="font-weight:900"></div>
+        <div class="muted" id="kQuoteAuthor" style="margin-top:6px"></div>
+      </div>
+    </div>
+
+    <div class="card soft">
+      <h3 style="margin:0 0 8px">Today’s Quest</h3>
+      <div class="card soft" style="margin-top:10px">
+        <div id="kTask" style="font-weight:900"></div>
+        <p class="muted" style="margin:10px 0 0">Mark done to increase your streak.</p>
+
+        <button class="btn primary" id="kDone">Mark Done ✅</button>
+        <button class="btn" id="kReset" style="margin-left:8px">Reset Today</button>
+        <p class="muted" id="kMsg" style="margin:10px 0 0"></p>
+      </div>
+
+      <div class="card soft" style="margin-top:12px">
+        <div style="font-weight:900">Streak</div>
+        <div class="muted" id="kStreak" style="margin-top:6px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card soft" style="margin-top:12px">
+    <h3 style="margin:0 0 8px">History (last 7 days)</h3>
+    <div id="kHistory"></div>
+  </div>
+</section>
