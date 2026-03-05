@@ -512,6 +512,54 @@
   }
 
   // -----------------------------
+  // Image fallback loader (GitHub Pages + direct /pages open)
+  // -----------------------------
+  function bindImageFallbacks() {
+    const imgs = Array.from(document.querySelectorAll("img.luhImg, img.galleryImg"));
+    if (!imgs.length) return;
+
+    const buildCandidates = (src) => {
+      const s = (src || "").trim();
+      if (!s) return [];
+      const base = s.replace(/^\.\//, "");
+      const list = [s];
+      // common variants
+      if (!s.startsWith("./")) list.push("./" + base);
+      if (!s.startsWith("../")) list.push("../" + base);
+      // switch between assets/images and images
+      list.push(s.replace("./assets/images/", "./images/"));
+      list.push(s.replace("assets/images/", "images/"));
+      list.push(s.replace("./images/", "./assets/images/"));
+      list.push(s.replace("images/", "assets/images/"));
+
+      // de-dup
+      return Array.from(new Set(list.filter(Boolean)));
+    };
+
+    imgs.forEach((img) => {
+      if (img.dataset.fallbackBound === "1") return;
+      img.dataset.fallbackBound = "1";
+
+      const candidates = buildCandidates(img.getAttribute("src"));
+      img.dataset.fallbacks = JSON.stringify(candidates);
+      img.dataset.fallbackIndex = "0";
+
+      img.addEventListener("error", () => {
+        try {
+          const arr = JSON.parse(img.dataset.fallbacks || "[]");
+          let i = parseInt(img.dataset.fallbackIndex || "0", 10);
+          i += 1;
+          if (i >= arr.length) return;
+          img.dataset.fallbackIndex = String(i);
+          img.src = arr[i];
+        } catch {
+          // ignore
+        }
+      });
+    });
+  }
+
+  // -----------------------------
   // Update topbar status
   // -----------------------------
   function updateTopBar() {
@@ -558,8 +606,7 @@
             </div>
           </div>
           <div class="heroMedia">
-            <img src="./images/hero.jpg" alt="Hero" onerror="this.outerHTML='<div class=&quot;muted&quot; style=&quot;padding:12px&quot;>Missing: <code>./images/hero.jpg</code></div>'" />
-            <p class="muted" style="margin:10px 0 0">Tip: pin drawers (📍) and the page auto-fits.</p>
+            <img class="luhImg" src="./assets/images/hero.jpg" alt="Hero" />
           </div>
         </div>
       </section>
@@ -637,6 +684,7 @@
           <button class="btn" data-tab="features">⚙️ Features</button>
           <button class="btn" data-tab="backup">📦 Export/Import</button>
           <button class="btn" data-tab="quotes">💬 Quotes</button>
+          <button class="btn" data-tab="gallery">🖼 Gallery</button>
           <button class="btn" data-tab="moderation">🛡 Moderation</button>
           <button class="btn" data-tab="audit">🧾 Audit Log</button>
         </div>
@@ -810,6 +858,9 @@
   async function route() {
     const page = routeName();
 
+    // page-scoped body class (auth centering)
+    document.body.classList.toggle("page-auth", page === "auth");
+
     if (page === "profile" && !isLoggedIn()) {
       openAuthModal(true);
       await loadPage("home");
@@ -821,6 +872,11 @@
     }
 
     await loadPage(page);
+
+    // Make images resilient (works even if user opens /pages/*.html directly)
+    bindImageFallbacks();
+
+    if (page === "home") hookHomeGallery();
 
     if (page === "auth") hookAuthPage();
     if (page === "profile") hookProfile();
@@ -837,7 +893,69 @@
   }
 
   
+  
   // -----------------------------
+  // Home Gallery: append admin-managed images
+  // -----------------------------
+  function getStaticGalleryList(){
+  // Option 2: static files committed in repo (works for everyone on GitHub Pages)
+  const list = (window.LUH_GALLERY && Array.isArray(window.LUH_GALLERY)) ? window.LUH_GALLERY : null;
+  if(list && list.length) return list;
+
+  // fallback defaults
+  return [
+    { src: "assets/images/g1.jpg", alt: "g1" },
+    { src: "assets/images/g2.jpg", alt: "g2" },
+    { src: "assets/images/g3.jpg", alt: "g3" },
+    { src: "assets/images/g4.jpg", alt: "g4" }
+  ];
+}
+
+function loadGalleryDraft(){
+  try{
+    const raw = localStorage.getItem("luh_gallery_draft_v1");
+    if(!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  }catch(_){ return []; }
+}
+
+function saveGalleryDraft(arr){
+  localStorage.setItem("luh_gallery_draft_v1", JSON.stringify(Array.isArray(arr)?arr:[]));
+}
+
+function hookHomeGallery(){
+  const gallery = document.getElementById("homeGallery");
+  if(!gallery) return;
+
+  // rebuild gallery from static list
+  const base = getStaticGalleryList();
+  gallery.innerHTML = "";
+  base.forEach((it, idx) => {
+    if(!it || !it.src) return;
+    const img = document.createElement("img");
+    img.className = "galleryImg";
+    img.setAttribute("data-lightbox","gallery");
+    img.src = it.src;
+    img.alt = it.alt || it.name || ("img-"+idx);
+    gallery.appendChild(img);
+  });
+
+  // draft items (admin preview only; not shared across devices)
+  const draft = loadGalleryDraft();
+  draft.forEach((it, idx) => {
+    if(!it || !it.src) return;
+    const img = document.createElement("img");
+    img.className = "galleryImg";
+    img.setAttribute("data-lightbox","gallery");
+    img.setAttribute("data-custom","1");
+    img.src = it.src;
+    img.alt = it.alt || it.name || ("draft-"+idx);
+    gallery.appendChild(img);
+  });
+}
+
+// -----------------------------
   // Gallery Lightbox
   // -----------------------------
   let __lbList = [];
@@ -898,6 +1016,10 @@
 
     $("#lbOverlay").classList.add("show");
   }
+  function openLightbox(list, index){
+    lbShow(list, index);
+  }
+
 
   function lbPrev(){
     if(!__lbList.length) return;
@@ -934,7 +1056,8 @@
     style.textContent = `
       .authOverlay{ position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; padding:16px; }
       .authOverlay.show{ display:flex; }
-      .authModal{ width:min(920px, 96vw); border:1px solid rgba(255,255,255,.14); background:color-mix(in srgb, var(--bg) 75%, transparent); backdrop-filter: blur(18px);
+      /* Smaller centered card */
+      .authModal{ width:min(640px, 96vw); border:1px solid rgba(255,255,255,.14); background:color-mix(in srgb, var(--bg) 75%, transparent); backdrop-filter: blur(18px);
         border-radius:22px; box-shadow: 0 18px 70px rgba(0,0,0,.55); overflow:hidden; }
       .authModalHeader{ padding:14px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,.14); }
       .authTabs{ display:flex; gap:8px; }
@@ -943,8 +1066,8 @@
       .authClose{ width:38px; height:38px; border-radius:14px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06); color:rgba(255,255,255,.92); cursor:pointer; font-weight:900; }
       .authClose.hideClose{ display:none; }
       .authModalBody{ padding:16px; }
-      .authGrid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-      @media (max-width: 820px){ .authGrid{ grid-template-columns:1fr; } }
+      /* Always 1 column so the hidden panel doesn't leave empty space */
+      .authGrid{ display:grid; grid-template-columns:1fr; gap:12px; }
     `;
     document.head.appendChild(style);
   }
@@ -972,8 +1095,7 @@
             <div class="logoDot" style="width:12px;height:12px"></div>
             <div>
               <div style="font-weight:900">Login / Register</div>
-              <div class="muted" style="font-size:12px">Admin: <b>admin</b> / <b>Admin@12345!</b></div>
-            </div>
+</div>
           </div>
           <div style="display:flex;gap:10px;align-items:center">
             <div class="authTabs">
@@ -988,7 +1110,7 @@
           <div class="authGrid">
             <div class="card soft" id="panelLogin">
               <h3 style="margin:0 0 10px">Login</h3>
-              <div class="row">
+              <div class="stack">
                 <input class="input" id="loginUserOrEmail" placeholder="Username or Email" />
                 <input class="input" id="loginPass" placeholder="Password" type="password" />
               </div>
@@ -998,16 +1120,13 @@
 
             <div class="card soft hide" id="panelRegister">
               <h3 style="margin:0 0 10px">Register</h3>
-              <div class="row">
+              <div class="stack">
                 <input class="input" id="regUsername" placeholder="Username (3–16, letters/numbers/_)" />
                 <input class="input" id="regEmail" placeholder="Email" />
-              </div>
-              <div class="row" style="margin-top:10px">
                 <input class="input" id="regName" placeholder="Full name" />
                 <input class="input" id="regDisplayName" placeholder="Display name" />
-              </div>
-              <div class="row" style="margin-top:10px">
                 <input class="input" id="regPass" placeholder="Password (Min 10 + Upper/Lower/Number/Symbol)" type="password" />
+
                 <div class="card soft" style="padding:10px;box-shadow:none">
                   <div class="muted" style="font-size:12px">Display name يظهر في Welcome + Chat</div>
                 </div>
@@ -1015,10 +1134,6 @@
               <button class="btn primary" id="registerBtn" style="margin-top:10px">Create account</button>
               <p class="muted" id="regMsg" style="margin:10px 0 0"></p>
             </div>
-          </div>
-
-          <div class="card soft" style="margin-top:12px">
-            <p class="muted" style="margin:0">Tip: You can open Guides/Chat from the top bar after login.</p>
           </div>
         </div>
       </div>
@@ -1418,6 +1533,15 @@
     a.remove();
     URL.revokeObjectURL(url);
   }
+  function readFileAsDataURL(file){
+    return new Promise((resolve,reject)=>{
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
+
   function toCSV(rows) {
     const headers = ["id", "ts", "user", "role", "type", "rating", "title", "message"];
     const escapeCSV = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
@@ -2421,11 +2545,243 @@ const QUOTES = [
       };
     }
 
+
+    
+const renderGallery = () => {
+  const base = getStaticGalleryList();
+  const draft = loadGalleryDraft();
+
+  const draftRows = (draft || []).map((it, i) => `
+    <div class="item">
+      <div class="itemHead">
+        <div>
+          <div style="font-weight:900">${esc(it.name || it.alt || "Image")}</div>
+          <div class="itemMeta">${esc(it.src || "")}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn" data-open-img="${esc(String(i))}">Preview</button>
+          <button class="btn danger" data-del-draft="${esc(String(i))}">Remove</button>
+        </div>
+      </div>
+    </div>
+  `).join("");
+
+  const staticPreview = (base || []).slice(0,12).map(it => `
+    <div class="badge" style="justify-content:space-between;width:100%">
+      <span>${esc(it.alt || it.name || "Image")}</span>
+      <span style="opacity:.7">${esc(it.src || "")}</span>
+    </div>
+  `).join("");
+
+  const fileText = `// assets/js/gallery_static.js\n// Edit this file and commit to GitHub to update the gallery for everyone.\n\nwindow.LUH_GALLERY = [\n${
+    (base || []).map(it => `  { src: "${(it.src||"").replace(/"/g,'\\\"')}", alt: "${(it.alt||it.name||"").replace(/"/g,'\\\"')}" }`).join(",\n")
+  }\n];\n`;
+
+  mount.innerHTML = `
+    <div class="card soft">
+      <h3 style="margin:0 0 10px">Gallery (Option 2 — Static images for GitHub)</h3>
+
+      <div class="muted" style="margin:0 0 12px;line-height:1.6">
+        <b>Best for GitHub Pages:</b> put your images inside <code>assets/images/gallery/</code> and update
+        <code>assets/js/gallery_static.js</code>. This makes the gallery visible to everyone.
+      </div>
+
+      <div class="card soft" style="box-shadow:none;padding:12px;margin-bottom:12px">
+        <div style="font-weight:900;margin-bottom:6px">1) Add image files to project</div>
+        <div class="muted" style="font-size:12px">
+          Place files here: <code>assets/images/gallery/</code> (example: <code>assets/images/gallery/my1.jpg</code>)
+        </div>
+      </div>
+
+      <div class="card soft" style="box-shadow:none;padding:12px;margin-bottom:12px">
+        <div style="font-weight:900;margin-bottom:8px">2) Add to gallery list (draft)</div>
+        <div class="row">
+          <input class="input" id="galFile" placeholder="File name (e.g. my1.jpg)" />
+          <input class="input" id="galAlt" placeholder="Caption/Alt (e.g. Science Fair)" />
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+          <button class="btn primary" id="galAddFile">Add to Draft</button>
+          <button class="btn" id="galClearDraft">Clear Draft</button>
+        </div>
+        <div class="muted" style="font-size:12px;margin-top:8px">
+          Draft is for preview on this device only. To publish for everyone, update <code>gallery_static.js</code> and commit to GitHub.
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px">
+        <div class="card soft" style="box-shadow:none;padding:12px">
+          <div style="font-weight:900;margin-bottom:8px">Current Static List (preview)</div>
+          <div class="list">${staticPreview || '<div class="muted">No items.</div>'}</div>
+        </div>
+
+        <div class="card soft" style="box-shadow:none;padding:12px">
+          <div style="font-weight:900;margin-bottom:8px">Draft Items</div>
+          <div class="list">${draftRows || '<div class="muted">No draft items.</div>'}</div>
+        </div>
+      </div>
+
+      <div class="card soft" style="box-shadow:none;padding:12px;margin-top:12px">
+        <div style="font-weight:900;margin-bottom:8px">3) Update gallery_static.js</div>
+        <textarea class="input" id="galFileText" style="min-height:170px;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">${esc(fileText)}</textarea>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+          <button class="btn primary" id="galDownloadJS">Download gallery_static.js</button>
+          <button class="btn" id="galCopyJS">Copy</button>
+        </div>
+        <div class="muted" style="font-size:12px;margin-top:8px">
+          Replace <code>assets/js/gallery_static.js</code> with this content, then push to GitHub.
+        </div>
+      </div>
+    </div>
+  `;
+
+  // actions
+  $("#galAddFile").onclick = () => {
+    const f = ($("#galFile").value || "").trim();
+    const alt = ($("#galAlt").value || "").trim();
+    if(!f){
+      toast("Enter a file name مثل my1.jpg");
+      return;
+    }
+    const src = "assets/images/gallery/" + f.replace(/^\/+/, "");
+    const next = [...draft, { src, alt: alt || f, name: alt || f }];
+    saveGalleryDraft(next);
+    hookHomeGallery();
+    renderGallery();
+    toast("Added to draft ✅");
+  };
+
+  $("#galClearDraft").onclick = () => {
+    saveGalleryDraft([]);
+    hookHomeGallery();
+    renderGallery();
+    toast("Draft cleared ✅");
+  };
+
+  $$("#adminTabMount [data-del-draft]").forEach(btn=>{
+    btn.onclick = () => {
+      const i = parseInt(btn.getAttribute("data-del-draft"),10);
+      const next = draft.filter((_,idx)=>idx!==i);
+      saveGalleryDraft(next);
+      hookHomeGallery();
+      renderGallery();
+      toast("Removed ✅");
+    };
+  });
+
+  $$("#adminTabMount [data-open-img]").forEach(btn=>{
+    btn.onclick = () => {
+      const i = parseInt(btn.getAttribute("data-open-img"),10);
+      const it = draft[i];
+      if(it && it.src) openLightbox(it.src, it.alt || "Image");
+    };
+  });
+
+  $("#galCopyJS").onclick = async () => {
+    try{
+      await navigator.clipboard.writeText($("#galFileText").value);
+      toast("Copied ✅");
+    }catch(_){
+      toast("Copy failed. Select text and copy manually.");
+    }
+  };
+
+  $("#galDownloadJS").onclick = () => {
+    const content = $("#galFileText").value || "";
+    const blob = new Blob([content], {type:"text/javascript"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "gallery_static.js";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 500);
+  };
+};
+
+      // add file
+      $("#galAddFile").onclick = async () => {
+        const f = $("#galFile").files && $("#galFile").files[0];
+        if(!f) return msg("Choose an image file first.");
+        if(f.size > 900 * 1024) return msg("File too large. Please use an image under ~900KB.");
+        const dataUrl = await readFileAsDataURL(f);
+        const id = "img_" + Math.random().toString(16).slice(2);
+        const next = (items || []).concat([{ id, name: f.name, src: dataUrl, ts: Date.now() }]).slice(-60);
+        saveGalleryCustom(next);
+        msg("Added ✅");
+        setTimeout(()=>msg(""),900);
+        $("#galFile").value = "";
+        renderGallery();
+        if(routeName() === "home") hookHomeGallery();
+      };
+
+      // delete
+      $$("[data-del-img]").forEach(btn=>{
+        btn.onclick = () => {
+          const id = btn.getAttribute("data-del-img");
+          if(!confirm("Delete this image?")) return;
+          const next = (loadGalleryCustom() || []).filter(x=>x.id !== id);
+          saveGalleryCustom(next);
+          renderGallery();
+          if(routeName() === "home") hookHomeGallery();
+        };
+      });
+
+      // preview
+      $$("[data-open-img]").forEach(btn=>{
+        btn.onclick = () => {
+          const id = btn.getAttribute("data-open-img");
+          const it = (loadGalleryCustom() || []).find(x=>x.id === id);
+          if(!it) return;
+          openLightbox([{src: it.src, alt: it.name || "image"}], 0);
+        };
+      });
+
+      // export/import/clear
+      $("#galExport").onclick = () => {
+        const payload = JSON.stringify(loadGalleryCustom() || [], null, 2);
+        downloadFile("gallery.json", payload, "application/json");
+      };
+
+      $("#galImport").onchange = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if(!file) return;
+        try{
+          const txt = await file.text();
+          const data = JSON.parse(txt);
+          if(!Array.isArray(data)) throw new Error("not array");
+          const cleaned = data.filter(x=>x && x.src).slice(-60).map(x=>({
+            id: x.id || ("img_" + Math.random().toString(16).slice(2)),
+            name: x.name || "",
+            src: x.src,
+            ts: x.ts || Date.now()
+          }));
+          saveGalleryCustom(cleaned);
+          msg("Imported ✅");
+          setTimeout(()=>msg(""),900);
+          renderGallery();
+          if(routeName() === "home") hookHomeGallery();
+        }catch(err){
+          msg("Invalid JSON file.");
+        }
+        e.target.value="";
+      };
+
+      $("#galClear").onclick = () => {
+        if(!confirm("Clear all custom gallery images?")) return;
+        saveGalleryCustom([]);
+        msg("Cleared ✅");
+        setTimeout(()=>msg(""),900);
+        renderGallery();
+        if(routeName() === "home") hookHomeGallery();
+      };
+    };
+
     const setTab = (tab) => {
       if (tab === "branding") renderBranding();
       else if (tab === "features") renderFeatures();
       else if (tab === "backup") renderBackup();
       else if (tab === "quotes") renderQuotes();
+      else if (tab === "gallery") renderGallery();
       else if (tab === "moderation") renderModeration();
       else if (tab === "audit") renderAudit();
       else renderBranding();

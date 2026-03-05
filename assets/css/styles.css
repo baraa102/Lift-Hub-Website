@@ -223,3 +223,31 @@ body.narrow .gallery{grid-template-columns:repeat(2,1fr)}
 /* Auth layout fixes */
 .authCard .stack{grid-template-columns:1fr !important;}
 .authBody{display:grid; gap:12px;}
+
+
+/* ---- Auth page layout overrides ---- */
+body.page-auth main{
+  max-width: none;
+  padding: 0;
+  display:flex;
+  justify-content:center;
+}
+body.page-auth #pageMount{
+  width:100%;
+}
+body.page-auth .authShell{
+  width:100%;
+  min-height: calc(100vh - 90px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: 18px;
+}
+body.page-auth .authCard{
+  width: min(520px, 92vw);
+  margin: 0 auto;
+}
+body.page-auth .authBody .stack{
+  display:grid;
+  gap:10px;
+}
