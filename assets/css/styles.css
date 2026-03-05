@@ -224,6 +224,24 @@ body.narrow .gallery{grid-template-columns:repeat(2,1fr)}
 .authCard .stack{grid-template-columns:1fr !important;}
 .authBody{display:grid; gap:12px;}
 
+/* Auth modal compact + centered */
+.authModalOverlay{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  padding: 18px !important;
+}
+.authModal{
+  width: min(560px, 92vw) !important;
+}
+.authModal .grid2{
+  display:grid !important;
+  grid-template-columns: 1fr !important; /* يمنع فراغ يمين */
+  gap: 12px !important;
+}
+.authModal input, .authModal button{
+  width: 100% !important;
+}
 
 /* ---- Auth page layout overrides ---- */
 body.page-auth main{
